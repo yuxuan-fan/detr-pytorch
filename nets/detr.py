@@ -60,16 +60,17 @@ class DETR(nn.Module):
         #self.input_proj(src)就是降维之后
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0] #这个【0】就是只有decoder的输出
 
-        # 输出分类信息
+        # 输出分类信息 这个6 是decoder数量
         # 6, batch_size, 100, 256 => 6, batch_size, 100, 21
-        outputs_class = self.class_embed(hs)
+        outputs_class = self.class_embed(hs) #全连接
         # 输出回归信息
         # 6, batch_size, 100, 256 => 6, batch_size, 100, 4
-        outputs_coord = self.bbox_embed(hs).sigmoid()
-        # 只输出transformer最后一层的内容
+        outputs_coord = self.bbox_embed(hs).sigmoid()#mlp
+        # 只输出transformer最后一层的内容 【-1】
         # batch_size, 100, 21, batch_size, 100, 4
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
         if self.aux_loss:
+            #辅助损失函数 处理最后一个输出以外，其余编码器输出都用来算辅助损失
             out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
         return out
 

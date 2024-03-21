@@ -33,7 +33,9 @@ class TransformerEncoder(nn.Module):
                 pos: Optional[Tensor] = None):
         output = src
         # 625, batch_size, 256 => ...(x6)... => 625, batch_size, 256
+        # 六个编码器
         for layer in self.layers:
+            #每个编码器都要加入位置信息 第一个encoder输入来自于backbone的特征
             output = layer(output, src_mask=mask, src_key_padding_mask=src_key_padding_mask, pos=pos)
 
         if self.norm is not None:
@@ -68,11 +70,11 @@ class TransformerEncoderLayer(nn.Module):
                      src_mask: Optional[Tensor] = None,
                      src_key_padding_mask: Optional[Tensor] = None,
                      pos: Optional[Tensor] = None):
-        # 添加位置信息
+        # QK 添加位置信息 V没有添加位置信息
         # 625, batch_size, 256 => 625, batch_size, 256
         q = k = self.with_pos_embed(src, pos)
         # 使用自注意力机制模块
-        # 625, batch_size, 256 => 625, batch_size, 256
+        #  625, batch_size, 256 => 625, batch_size, 256
         src2 = self.self_attn(q, k, value=src, attn_mask=src_mask, key_padding_mask=src_key_padding_mask)[0]
         # 添加残差结构
         # 625, batch_size, 256 => 625, batch_size, 256
@@ -129,6 +131,7 @@ class TransformerDecoder(nn.Module):
         intermediate = []
 
         for layer in self.layers:
+            #每个解码器都要输入query_pos和pos
             output = layer(output, memory, tgt_mask=tgt_mask,
                            memory_mask=memory_mask,
                            tgt_key_padding_mask=tgt_key_padding_mask,
@@ -188,6 +191,7 @@ class TransformerDecoderLayer(nn.Module):
         # 100, batch_size, 256 => 100, batch_size, 256
         q = k = self.with_pos_embed(tgt, query_pos)
         # q = k = v = 100, batch_size, 256 => 100, batch_size, 256
+        #这里v是tgt自身
         tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)[0]
         # 添加残差结构
         # 100, batch_size, 256 => 100, batch_size, 256
@@ -195,7 +199,8 @@ class TransformerDecoderLayer(nn.Module):
         tgt = self.norm1(tgt)
         
         #---------------------------------------------#
-        #   q、k、v联合做一个self-attention
+        #   q、k、v联合做一个self-attention 多头
+        #这里v是memory
         #---------------------------------------------#
         # q = 100, batch_size, 256, k = 625, batch_size, 256, v = 625, batch_size, 256
         # 输出的序列长度以q为准 => 100, batch_size, 256
@@ -262,13 +267,13 @@ class Transformer(nn.Module):
         # 定义用到的transformer的encoder层，然后定义使用到的norm层
         encoder_layer   = TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, activation, normalize_before)
         encoder_norm    = nn.LayerNorm(d_model) if normalize_before else None
-        # 构建Transformer的Encoder，一共有6层
+        # 构建Transformer的Encoder，一共有6层 堆叠
         self.encoder    = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
 
         # 定义用到的transformer的decoder层，然后定义使用到的norm层
         decoder_layer   = TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout, activation, normalize_before)
         decoder_norm    = nn.LayerNorm(d_model)
-        # 构建Transformer的Decoder，一共有6层
+        # 构建Transformer的Decoder，一共有6层 堆叠
         self.decoder    = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm, return_intermediate=return_intermediate_dec)
 
         self._reset_parameters()
@@ -290,11 +295,14 @@ class Transformer(nn.Module):
         query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
         # batch_size, 25, 25 => batch_size, 625
         mask        = mask.flatten(1)
-        # 100, batch_size, 256
+
+
+        # 100, batch_size, 256 全0初始化object queries
         tgt         = torch.zeros_like(query_embed)
         
-        # 625, batch_size, 256 => 625, batch_size, 256
+        # 625, batch_size, 256 => 625, batch_size, 256 memory是encoder的输出
         memory      = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+
         # 625, batch_size, 256 => 6, 100, batch_size, 256
         hs          = self.decoder(tgt, memory, memory_key_padding_mask=mask, pos=pos_embed, query_pos=query_embed)
         # 6, 100, batch_size, 256 => 6, batch_size, 100, 256
