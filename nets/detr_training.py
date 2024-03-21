@@ -1,4 +1,3 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import math
 from functools import partial
 
@@ -47,6 +46,8 @@ class HungarianMatcher(nn.Module):
         cost_class = -out_prob[:, tgt_ids]
 
         # 计算预测框和真实框之间的L1成本。预测越准值越小。
+        # torch.cdist 函数是一个用于计算两个输入张量之间的距离的函数。
+        # 它的第一个参数是一个矩阵（或者可以看作是一个集合）out_bbox，第二个参数是另一个矩阵（或集合）tgt_bbox。函数根据 p 的值计算这两个矩阵之间的距离。
         cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
 
         # 计算预测框和真实框之间的IOU成本。预测越准值越小。

@@ -13,6 +13,7 @@ from .ops import NestedTensor, is_main_process
 
 class PositionEmbeddingSine(nn.Module):
     """
+    第一种编码方式
     这是一个更标准的位置嵌入版本，按照sine进行分布
     """
     def __init__(self, num_pos_feats=64, temperature=10000, normalize=False, scale=None):
@@ -50,6 +51,7 @@ class PositionEmbeddingSine(nn.Module):
 
 class PositionEmbeddingLearned(nn.Module):
     """
+    第二种
     创建可学习的位置向量
     """
     def __init__(self, num_pos_feats=256):
@@ -76,7 +78,7 @@ class PositionEmbeddingLearned(nn.Module):
         return pos
 
 def build_position_encoding(position_embedding, hidden_dim=256):
-    # 创建位置向量
+    # 创建位置向量 两种编码方式
     N_steps = hidden_dim // 2
     if position_embedding in ('v2', 'sine'):
         # TODO find a better way of exposing other arguments
@@ -164,14 +166,15 @@ class Backbone(BackboneBase):
 
 class Joiner(nn.Sequential):
     """
-    用于将主干和位置编码模块进行结合
+    用于将主干和位置编码模块进行链接
     """
     def __init__(self, backbone, position_embedding):
         super().__init__(backbone, position_embedding)
 
     def forward(self, tensor_list: NestedTensor):
+        #self[0] = backbone
         xs                      = self[0](tensor_list)
-        out: List[NestedTensor] = []
+        out: List[NestedTensor] = [] #features
         pos                     = []
         for name, x in xs.items():
             out.append(x)

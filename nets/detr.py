@@ -10,7 +10,7 @@ from .transformer import build_transformer
 
 
 
-class MLP(nn.Module):
+class MLP(nn.Module):# 多层感知机 FFN里面用的吧
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
         super().__init__()
         self.num_layers = num_layers
@@ -27,7 +27,7 @@ class DETR(nn.Module):
         super().__init__()
         # 要使用的主干
         self.backbone       = build_backbone(backbone, position_embedding, hidden_dim, pretrained=pretrained)
-        self.input_proj     = nn.Conv2d(self.backbone.num_channels, hidden_dim, kernel_size=1)
+        self.input_proj     = nn.Conv2d(self.backbone.num_channels, hidden_dim, kernel_size=1) #1*1卷积用于将CNN输出的特征图降维
         
         # 要使用的transformers模块
         self.transformer    = build_transformer(hidden_dim=hidden_dim, pre_norm=False)
@@ -37,7 +37,7 @@ class DETR(nn.Module):
         self.class_embed    = nn.Linear(hidden_dim, num_classes + 1)
         # 输出回归信息
         self.bbox_embed     = MLP(hidden_dim, hidden_dim, 4, 3)
-        # 用于传入transformer进行查询的查询向量
+        # 用于传入transformer进行查询的查询向量 encoder
         self.query_embed    = nn.Embedding(num_queries, hidden_dim)
         
         # 查询向量的长度与是否使用辅助分支
@@ -46,10 +46,10 @@ class DETR(nn.Module):
 
     def forward(self, samples: NestedTensor):
         if isinstance(samples, (list, torch.Tensor)):
-            samples = nested_tensor_from_tensor_list(samples)
+            samples = nested_tensor_from_tensor_list(samples)#将图像信息包裹在tensor中
         # 传入主干网络中进行预测
         # batch_size, 3, 800, 800 => batch_size, 2048, 25, 25
-        features, pos = self.backbone(samples)
+        features, pos = self.backbone(samples)#高维特征信息以及位置编码信息
 
         # 将网络的结果进行分割，把特征和mask进行分开
         # batch_size, 2048, 25, 25, batch_size, 25, 25
@@ -57,7 +57,8 @@ class DETR(nn.Module):
         assert mask is not None
         # 将主干的结果进行一个映射，然后和查询向量和位置向量传入transformer。
         # batch_size, 2048, 25, 25 => batch_size, 256, 25, 25 => 6, batch_size, 100, 256
-        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
+        #self.input_proj(src)就是降维之后
+        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0] #这个【0】就是只有decoder的输出
 
         # 输出分类信息
         # 6, batch_size, 100, 256 => 6, batch_size, 100, 21
